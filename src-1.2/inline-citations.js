@@ -2,13 +2,14 @@ addListeners = async () => {
   const openaiApiKey = "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" || Zotero.Prefs.get(
     "extensions.make-it-red.openai-api-key"
   );
-  const avesApiKey = "9R4KWANC2Y4JYCGJV1HVQQ8HJ282" || Zotero.Prefs.get("extensions.make-it-red.aves-api-key");
+  const avesApiKey = "QY430HSN45MNZRG5TKH6KPSZDG8F" || Zotero.Prefs.get("extensions.make-it-red.aves-api-key");
 
   if (!openaiApiKey) throw new Error("OpenAI API key not set");
   if (!avesApiKey) throw new Error("Aves API key not set");
 
   const activeTab = Zotero.getActiveZoteroPane();
   const activeDoc = activeTab.document;
+  const fetch = activeDoc.defaultView.fetch;
 
   const readers = Zotero.Reader._readers.filter(
     (r) => r._window.document === activeDoc
@@ -27,7 +28,7 @@ addListeners = async () => {
       }
 
       if (window.citeListenersInterval !== undefined)
-        clearInterval(window.citeListenersInterval);
+        window.clearInterval(window.citeListenersInterval);
 
       const wrapOutside =
         (fn) =>
@@ -39,22 +40,19 @@ addListeners = async () => {
         };
 
       async function fetchAvesAPI(query) {
-        const searchUrl = `https://api.avesapi.com/search?apikey=${avesApiKey}&type=web&query=${encodeURIComponent(
+        const searchUrl = `http://localhost:8080/https://api.avesapi.com/search?apikey=${avesApiKey}&type=web&query=${encodeURIComponent(
           query
         )}&output=json&num=10`;
 
         try {
           const response = await fetch(searchUrl);
-
           if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
           }
-
           const data = await response.json();
           return data.result.organic_results;
-        } catch (err) {
-          if (err.message === "Failed to fetch") alert("CORS error");
-          throw err;
+        } catch (error) {
+          throw new Error(error + `, query: ${query}, url: ${searchUrl}`);
         }
       }
       window.fetchAvesAPI = wrapOutside(fetchAvesAPI);
@@ -66,9 +64,10 @@ addListeners = async () => {
             let translate = new Zotero.Translate.Web();
 
             // Set the translator to the arXiv translator
-            // translate.setTranslator("58ab2618-4a25-4b9b-83a7-80cd0259f896");
+            if(url.includes("arxiv")) translate.setTranslator("58ab2618-4a25-4b9b-83a7-80cd0259f896");
 
             // Set the document to the fetched document
+            if(!doc) throw new Error("No document");
             translate.setDocument(doc);
 
             // Get the collection ID
@@ -92,9 +91,9 @@ addListeners = async () => {
             // Open the first new item in a new tab
             if (newItems.length > 0) {
               try {
-                ZoteroPane_Local.viewItems([newItems[0]]);
+                activeDoc.defaultView.ZoteroPane_Local.viewItems([newItems[0]]);
               } catch (err) {
-                window.alert(err + "");
+                activeDoc.defaultView.alert(err + "");
               }
             }
           });
@@ -110,8 +109,6 @@ addListeners = async () => {
       script.textContent =
         "(" +
         (async () => {
-          const { pdfjsLib, PDFViewerApplication, PDFPageProxy } = window;
-          const pdfDoc = PDFViewerApplication.pdfDocument;
 
           const wrapInside =
             (fn) =>
@@ -130,7 +127,10 @@ addListeners = async () => {
           const fetchAvesAPI = wrapInside(window.fetchAvesAPI);
 
           async function openInlineCitation(citation) {
-            const destination = await pdfDoc.getDestination(citation);
+            const { pdfjsLib, PDFViewerApplication, PDFPageProxy } = window;
+            const pdfDoc = PDFViewerApplication.pdfDocument;
+            const destination = await pdfDoc.getDestination(decodeURIComponent(citation));
+            if(!destination) alert(decodeURIComponent(citation)+" not found")
             const loc = destination[0].num;
             const yPos = destination[3];
 
@@ -242,7 +242,7 @@ addListeners = async () => {
                       }
                     })();
                     evt.preventDefault();
-                    event.stopPropagation();
+                    evt.stopPropagation();
                     return false;
                   }
                   return oldOnClick.call(this, evt);
@@ -256,7 +256,7 @@ addListeners = async () => {
 
       document.body.appendChild(script);
     } catch (err) {
-      alert(err);
+        activeDoc.defaultView.alert(err);
     }
   }
 };

@@ -158,7 +158,7 @@ async function startup({
   Services.scriptloader.loadSubScript(rootURI + "make-it-red.js");
   Services.scriptloader.loadSubScript(rootURI + "inline-citations.js");
 
-  addListeners();
+  Zotero.setTimeout(() => addListeners(), 2000);
   Zotero.Notifier.registerObserver(
     {
       notify: function (event, type, ids, extraData) {
