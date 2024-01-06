@@ -2,7 +2,7 @@ var MakeItRed;
 var addListeners;
 
 function log(msg) {
-	Zotero.debug("Make It Red: " + msg);
+	Zotero.debug("Open Inline Citation: " + msg);
 }
 
 function install() {
@@ -13,7 +13,7 @@ async function startup({ id, version, rootURI }) {
 	log("Starting 2.0");
 	
 	Zotero.PreferencePanes.register({
-		pluginID: 'make-it-red@example.com',
+		pluginID: 'open-inline-citation@example.com',
 	});
 	
 	Services.scriptloader.loadSubScript(rootURI + 'inline-citations.js');

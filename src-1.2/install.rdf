@@ -3,24 +3,24 @@
         xmlns:em="http://www.mozilla.org/2004/em-rdf#">
 
     <Description about="urn:mozilla:install-manifest">
-        <em:id>make-it-red@example.com</em:id>
-        <em:name>Make It Red</em:name>
-        <em:version>1.2</em:version>
+        <em:id>open-inline-citation@example.com</em:id>
+        <em:name>Open Inline Citation</em:name>
+        <em:version>0.1</em:version>
         <em:multiprocessCompatible>true</em:multiprocessCompatible>
-        <em:updateURL>https://zotero-download.s3.amazonaws.com/tmp/make-it-red/updates-1.1.json</em:updateURL>
-        <em:homepageURL>https://github.com/zotero/make-it-red</em:homepageURL>
+        <em:updateURL>https://zotero-download.s3.amazonaws.com/tmp/open-inline-citation/updates-0.1.json</em:updateURL>
+        <em:homepageURL>https://github.com/zotero/open-inline-citation</em:homepageURL>
         <em:localized>
             <Description>
                 <em:locale>en-US</em:locale>
-                <em:name>Make It Red </em:name>
-                <em:description>Makes everything red</em:description>
+                <em:name>Open Inline Citation </em:name>
+                <em:description>CMD-click any inline citation to read it in a new tab</em:description>
             </Description>
         </em:localized>
 
         <em:creator>Zotero</em:creator>
         <em:type>2</em:type> <!-- type=extension -->
-        <em:iconURL>chrome://make-it-red/skin/icon.png</em:iconURL>
-        <em:icon64URL>chrome://make-it-red/skin/icon64.png</em:icon64URL>
+        <em:iconURL>chrome://open-inline-citation/skin/icon.png</em:iconURL>
+        <em:icon64URL>chrome://open-inline-citation/skin/icon64.png</em:icon64URL>
         <em:bootstrap>true</em:bootstrap>
 
         <em:targetApplication>

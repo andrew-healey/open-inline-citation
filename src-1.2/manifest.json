@@ -1,13 +1,12 @@
 {
 	"manifest_version": 2,
-	"name": "Make It Red",
-	"version": "1.2",
-	"description": "Makes everything red",
-	"homepage_url": "https://github.com/zotero/make-it-red",
+	"name": "Open Inline Citation",
+	"version": "0.1",
+	"description": "CMD-click any inline citation to read it in a new tab",
+	"homepage_url": "https://github.com/andrew-healey/open-inline-citation",
 	"applications": {
 		"zotero": {
-			"id": "make-it-red@example.com",
-			"update_url": "https://zotero-download.s3.amazonaws.com/tmp/make-it-red/updates-1.2.json",
+			"id": "open-inline-citation@example.com",
 			"strict_min_version": "6.999",
 			"strict_max_version": "7.0.*"
 		}

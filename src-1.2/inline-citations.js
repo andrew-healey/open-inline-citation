@@ -1,8 +1,10 @@
 addListeners = async () => {
-  const openaiApiKey = "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" || Zotero.Prefs.get(
-    "extensions.make-it-red.openai-api-key"
-  );
-  const avesApiKey = "QY430HSN45MNZRG5TKH6KPSZDG8F" || Zotero.Prefs.get("extensions.make-it-red.aves-api-key");
+  const openaiApiKey =
+    "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" ||
+    Zotero.Prefs.get("extensions.open-inline-citation.openai-api-key");
+  const avesApiKey =
+    "QY430HSN45MNZRG5TKH6KPSZDG8F" ||
+    Zotero.Prefs.get("extensions.open-inline-citation.aves-api-key");
 
   if (!openaiApiKey) throw new Error("OpenAI API key not set");
   if (!avesApiKey) throw new Error("Aves API key not set");
@@ -60,16 +62,6 @@ addListeners = async () => {
       async function addToLibrary(url, collectionName) {
         return new Promise((res) => {
           Zotero.HTTP.processDocuments(url, async function (doc) {
-            // Create a new Web translator instance
-            let translate = new Zotero.Translate.Web();
-
-            // Set the translator to the arXiv translator
-            if(url.includes("arxiv")) translate.setTranslator("58ab2618-4a25-4b9b-83a7-80cd0259f896");
-
-            // Set the document to the fetched document
-            if(!doc) throw new Error("No document");
-            translate.setDocument(doc);
-
             // Get the collection ID
             let collections = Zotero.Collections.getByLibrary(
               Zotero.Libraries.userLibraryID
@@ -79,23 +71,34 @@ addListeners = async () => {
               throw new Error(`Collection "${collectionName}" not found`);
             }
 
-            // Translate the item
-            let newItems = await translate.translate({
-              libraryID: Zotero.Libraries.userLibraryID,
-              collections: [collection.id],
-            });
+            let newItem = null;
 
-            // The newItems array now contains the imported items
-            console.log(newItems);
+            if (url.endsWith(".pdf")) {
+              newItem = await Zotero.Attachments.importFromURL({
+                url: url,
+                libraryID: Zotero.Libraries.userLibraryID,
+                collections: [collection.key],
+              });
+            } else {
+              let translate = new Zotero.Translate.Web();
+
+              if (url.includes("arxiv"))
+                translate.setTranslator("58ab2618-4a25-4b9b-83a7-80cd0259f896");
+              if (!doc) throw new Error("No document");
+              translate.setDocument(doc);
+
+              // Translate the item
+              newItem = (await translate.translate({
+                libraryID: Zotero.Libraries.userLibraryID,
+                collections: [collection.id],
+              }))[0];
+            }
+
+            // activeDoc.defaultView.alert(JSON.stringify(newItem));
 
             // Open the first new item in a new tab
-            if (newItems.length > 0) {
-              try {
-                activeDoc.defaultView.ZoteroPane_Local.viewItems([newItems[0]]);
-              } catch (err) {
-                activeDoc.defaultView.alert(err + "");
-              }
-            }
+            activeDoc.defaultView.ZoteroPane_Local.viewItems([newItem]);
+            res();
           });
         });
       }
@@ -109,28 +112,31 @@ addListeners = async () => {
       script.textContent =
         "(" +
         (async () => {
-
           const wrapInside =
             (fn) =>
-            async (...args) =>
-              JSON.parse(
-                await new Promise((res, rej) => {
+            async (...args) =>{
+                const res = await new Promise((res, rej) => {
                   const k = Math.random();
                   window[k] = {
                     res,
                     rej,
                   };
                   fn(k, ...args);
-                })
-              );
+                });
+                return res && JSON.parse(res);
+            }
 
           const fetchAvesAPI = wrapInside(window.fetchAvesAPI);
 
           async function openInlineCitation(citation) {
+            const startTime = Date.now();
             const { pdfjsLib, PDFViewerApplication, PDFPageProxy } = window;
             const pdfDoc = PDFViewerApplication.pdfDocument;
-            const destination = await pdfDoc.getDestination(decodeURIComponent(citation));
-            if(!destination) alert(decodeURIComponent(citation)+" not found")
+            const destination = await pdfDoc.getDestination(
+              decodeURIComponent(citation)
+            );
+            if (!destination)
+              alert(decodeURIComponent(citation) + " not found");
             const loc = destination[0].num;
             const yPos = destination[3];
 
@@ -196,10 +202,18 @@ addListeners = async () => {
             try {
               const googleQuery = await fetchOpenAI(fullPageText, citation);
 
+              const openaiTime = Date.now() - startTime;
+
               //   alert(citation+" -> "+googleQuery);
 
               const results = await fetchAvesAPI(googleQuery);
+              const avesTime = Date.now() - startTime - openaiTime;
 
+            //   alert(
+            //     `OpenAI: ${openaiTime}ms, Aves: ${avesTime}ms, Library: unknown. Query is ${JSON.stringify(
+            //       googleQuery
+            //     )}`
+            //   );
               const prefixWhitelist = [
                 "https://arxiv.org/abs",
                 "https://openreview.net",
@@ -215,6 +229,8 @@ addListeners = async () => {
 
               const addToLibrary = wrapInside(window.addToLibrary);
               await addToLibrary(url, "Inline citations");
+              const libraryTime =
+                Date.now() - startTime - avesTime - openaiTime;
             } catch (err) {
               alert(err);
             }
@@ -256,7 +272,7 @@ addListeners = async () => {
 
       document.body.appendChild(script);
     } catch (err) {
-        activeDoc.defaultView.alert(err);
+      activeDoc.defaultView.alert(err);
     }
   }
 };

@@ -18,7 +18,7 @@ MakeItRed = {
 	},
 	
 	log(msg) {
-		Zotero.debug("Make It Red: " + msg);
+		Zotero.debug("Open Inline Citation: " + msg);
 	},
 	
 	addToWindow(window) {
@@ -30,7 +30,7 @@ MakeItRed = {
 		
 		// Add a stylesheet to the main Zotero pane
 		let link1 = doc.createElementNS(HTML_NS, 'link');
-		link1.id = 'make-it-red-stylesheet';
+		link1.id = 'open-inline-citation-stylesheet';
 		link1.type = 'text/css';
 		link1.rel = 'stylesheet';
 		link1.href = this.rootURI + 'style.css';
@@ -41,21 +41,21 @@ MakeItRed = {
 		let menuitem = doc.createElementNS(XUL_NS, 'menuitem');
 		menuitem.id = 'make-it-green-instead';
 		menuitem.setAttribute('type', 'checkbox');
-		menuitem.setAttribute('data-l10n-id', 'make-it-red-green-instead');
+		menuitem.setAttribute('data-l10n-id', 'open-inline-citation-green-instead');
 		menuitem.addEventListener('command', () => {
 			MakeItRed.toggleGreen(window, menuitem.getAttribute('checked') === 'true');
 		});
 		doc.getElementById('menu_viewPopup').appendChild(menuitem);
 		this.storeAddedElement(menuitem);
 		
-		// Use strings from make-it-red.ftl (Fluent) in Zotero 7
+		// Use strings from open-inline-citation.ftl (Fluent) in Zotero 7
 		if (Zotero.platformMajorVersion >= 102) {
-			window.MozXULElement.insertFTLIfNeeded("make-it-red.ftl");
+			window.MozXULElement.insertFTLIfNeeded("open-inline-citation.ftl");
 		}
-		// Use strings from make-it-red.properties (legacy properties format) in Zotero 6
+		// Use strings from open-inline-citation.properties (legacy properties format) in Zotero 6
 		else {
 			let stringBundle = Services.strings.createBundle(
-				'chrome://make-it-red/locale/make-it-red.properties'
+				'chrome://open-inline-citation/locale/open-inline-citation.properties'
 			);
 			doc.getElementById('make-it-green-instead')
 				.setAttribute('label', stringBundle.GetStringFromName('makeItGreenInstead.label'));
@@ -85,7 +85,7 @@ MakeItRed = {
 			let elem = doc.getElementById(id);
 			if (elem) elem.remove();
 		}
-		doc.querySelector('[href="make-it-red.ftl"]').remove();
+		doc.querySelector('[href="open-inline-citation.ftl"]').remove();
 	},
 	
 	removeFromAllWindows() {
@@ -114,6 +114,6 @@ MakeItRed = {
 		this.log(`Host is ${host}`);
 		
 		// Retrieve a global pref
-		this.log(`Intensity is ${Zotero.Prefs.get('extensions.make-it-red.intensity', true)}`);
+		this.log(`Intensity is ${Zotero.Prefs.get('extensions.open-inline-citation.intensity', true)}`);
 	},
 };

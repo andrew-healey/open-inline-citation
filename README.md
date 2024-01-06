@@ -1,4 +1,4 @@
-# Make It Red
+# Open Inline Citation
 
 A sample plugin for Zotero 7
 
