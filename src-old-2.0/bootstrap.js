@@ -1,5 +1,4 @@
 var MakeItRed;
-var addListeners;
 
 function log(msg) {
 	Zotero.debug("Make It Red: " + msg);
@@ -14,17 +13,14 @@ async function startup({ id, version, rootURI }) {
 	
 	Zotero.PreferencePanes.register({
 		pluginID: 'make-it-red@example.com',
+		src: rootURI + 'preferences.xhtml',
+		scripts: [rootURI + 'preferences.js']
 	});
 	
-	Services.scriptloader.loadSubScript(rootURI + 'inline-citations.js');
-	Zotero.Notifier.registerObserver({
-		notify: function(event, type, ids, extraData) {
-			if (event === 'select' && type === 'tab') {
-				console.log('Tab switched to', ids[0]);
-				addListeners();
-			}
-		}
-	}, ['tab']);
+	Services.scriptloader.loadSubScript(rootURI + 'make-it-red.js');
+	MakeItRed.init({ id, version, rootURI });
+	MakeItRed.addToAllWindows();
+	await MakeItRed.main();
 }
 
 function onMainWindowLoad({ window }) {
