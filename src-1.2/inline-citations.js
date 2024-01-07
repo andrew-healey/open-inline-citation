@@ -2,16 +2,15 @@ addListeners = async () => {
   const openaiApiKey =
     "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" ||
     Zotero.Prefs.get("extensions.open-inline-citation.openai-api-key");
-  const avesApiKey =
-    "QY430HSN45MNZRG5TKH6KPSZDG8F" ||
-    Zotero.Prefs.get("extensions.open-inline-citation.aves-api-key");
+  const googleApiKey = "AIzaSyDfSvIBjkKv4EkkZjK9auGOTJBoS1PRxEE";
 
   if (!openaiApiKey) throw new Error("OpenAI API key not set");
-  if (!avesApiKey) throw new Error("Aves API key not set");
+  if (!googleApiKey) throw new Error("Google API key not set");
 
   const activeTab = Zotero.getActiveZoteroPane();
   const activeDoc = activeTab.document;
-  const fetch = activeDoc.defaultView.fetch;
+  const activeWindow = activeDoc.defaultView;
+  const fetch = activeWindow.fetch;
 
   const readers = Zotero.Reader._readers.filter(
     (r) => r._window.document === activeDoc
@@ -41,23 +40,17 @@ addListeners = async () => {
             .catch((err) => window[key].rej(err + ""));
         };
 
-      async function fetchAvesAPI(query) {
-        const searchUrl = `http://localhost:8080/https://api.avesapi.com/search?apikey=${avesApiKey}&type=web&query=${encodeURIComponent(
-          query
-        )}&output=json&num=10`;
-
-        try {
-          const response = await fetch(searchUrl);
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
-          const data = await response.json();
-          return data.result.organic_results;
-        } catch (error) {
-          throw new Error(error + `, query: ${query}, url: ${searchUrl}`);
-        }
+      async function fetchGoogleAPI(query) {
+        //   alert(encodeURIComponent(query))
+        const res = await (
+          await fetch(
+            `https://customsearch.googleapis.com/customsearch/v1?q=${encodeURIComponent(query)}&key=AIzaSyDfSvIBjkKv4EkkZjK9auGOTJBoS1PRxEE&cx=b11bc5cc9867043ab`
+          )
+        ).json();
+        if (!res.items) alert(JSON.stringify(res));
+        return res.items.map((i) => i.link);
       }
-      window.fetchAvesAPI = wrapOutside(fetchAvesAPI);
+      window.fetchGoogleAPI = wrapOutside(fetchGoogleAPI);
 
       async function addToLibrary(url, collectionName) {
         return new Promise((res) => {
@@ -88,10 +81,12 @@ addListeners = async () => {
               translate.setDocument(doc);
 
               // Translate the item
-              newItem = (await translate.translate({
-                libraryID: Zotero.Libraries.userLibraryID,
-                collections: [collection.id],
-              }))[0];
+              newItem = (
+                await translate.translate({
+                  libraryID: Zotero.Libraries.userLibraryID,
+                  collections: [collection.id],
+                })
+              )[0];
             }
 
             // activeDoc.defaultView.alert(JSON.stringify(newItem));
@@ -114,19 +109,19 @@ addListeners = async () => {
         (async () => {
           const wrapInside =
             (fn) =>
-            async (...args) =>{
-                const res = await new Promise((res, rej) => {
-                  const k = Math.random();
-                  window[k] = {
-                    res,
-                    rej,
-                  };
-                  fn(k, ...args);
-                });
-                return res && JSON.parse(res);
-            }
+            async (...args) => {
+              const res = await new Promise((res, rej) => {
+                const k = Math.random();
+                window[k] = {
+                  res,
+                  rej,
+                };
+                fn(k, ...args);
+              });
+              return res && JSON.parse(res);
+            };
 
-          const fetchAvesAPI = wrapInside(window.fetchAvesAPI);
+          const fetchGoogleAPI = wrapInside(window.fetchGoogleAPI);
 
           async function openInlineCitation(citation) {
             const startTime = Date.now();
@@ -138,7 +133,8 @@ addListeners = async () => {
             if (!destination)
               alert(decodeURIComponent(citation) + " not found");
             const loc = destination[0].num;
-            const yPos = destination[3];
+            const targetY = destination[3];
+            const targetX = destination[2];
 
             let rightPage = null;
             let nextPage = null;
@@ -154,18 +150,43 @@ addListeners = async () => {
 
             if (!rightPage) alert("error, not found");
 
-            const textContent = await rightPage.getTextContent();
-            const items = nextPage
-              ? [
-                  ...textContent.items,
-                  ...(await nextPage.getTextContent()).items,
-                ]
-              : textContent.items;
-            const fullPageText = items.map((i) => i.str).join("\n");
-            // alert(fullPageText)
+            const strippedContent = [
+              await rightPage.getTextContent(),
+              nextPage && (await nextPage.getTextContent()),
+            ]
+              .filter((c) => c)
+              .map((c) =>
+                c.items.map((i) => ({
+                  str: i.str,
+                  transform: i.transform,
+                  height: i.height,
+                }))
+              )
+              .reduce((agg, nxt) => [...agg, ...nxt], []);
+
+            const firstMatchIdx = strippedContent.findIndex(
+              (i) => i.transform[4] > targetX && i.transform[5] < targetY
+            );
+
+            let lastMatchIdx = strippedContent.findIndex(
+              (i, idx) =>
+                idx > firstMatchIdx &&
+                Math.abs(
+                  i.transform[5] - strippedContent[idx - 1].transform[5]
+                ) >=
+                  i.height * 1.5 &&
+                strippedContent[idx - 1].str.endsWith(".")
+            );
+            if (lastMatchIdx < 0) lastMatchIdx += strippedContent.length;
+            const citationText = strippedContent
+                .slice(firstMatchIdx,lastMatchIdx)
+                .map(i=>i.str)
+                .reduce((agg,nxt)=>agg.endsWith("-") ? agg.slice(0,-1)+nxt:agg+" "+nxt,"")
+                .trim();
 
             const apiKey = window.openaiApiKey;
-            async function fetchOpenAI(pageText, citation) {
+            async function fetchOpenAI(citationText) {
+                return citationText;
               const response = await fetch(
                 "https://api.openai.com/v1/chat/completions",
                 {
@@ -179,12 +200,21 @@ addListeners = async () => {
                     messages: [
                       {
                         role: "user",
-                        content: `Here's a page of citations: ${JSON.stringify(
-                          pageText
-                        )}\nHere's the id of the citation I'm looking for: ${JSON.stringify(
-                          citation
-                        )}. Tell me the title of the citation I want. Don't say anything besides the title.`,
+                        content: `Here's a bibliography entry, with an author+date+title+etc for a paper: ${JSON.stringify(
+                          "Kearns, M. and Valiant, L. (1994). Cryptographic limitations on learning boolean formulae and finite automata. Journal of the ACM (JACM) 41 67–95."
+                        )}\nExtract either the URL OR the title. Put it in "quotes".`,
                       },
+                      {
+                        role: "assistant",
+                        content: `"Cryptographic limitations on learning boolean formulae and finite automata"`,
+                      },
+                      {
+                        role: "user",
+                        content: `Here's a bibliography entry, with an author+date+title+etc for a paper: ${JSON.stringify(
+                          citationText
+                        )}\nExtract either the URL OR the title. Put it in "quotes".`,
+                      },
+                      
                     ],
                     temperature: 0,
                     max_tokens: 256,
@@ -197,40 +227,30 @@ addListeners = async () => {
 
               const data = await response.json();
               if (!data.choices) throw new Error(JSON.stringify(data));
-              return data.choices[0].message.content;
+              const { content } = data.choices[0].message;
+              const quotesMatch = content.match(/"(.*)"/);
+            //   alert(content)
+              return quotesMatch && quotesMatch[1].trim();
             }
             try {
-              const googleQuery = await fetchOpenAI(fullPageText, citation);
+              const urlOrTitle = await fetchOpenAI(citationText);
 
-              const openaiTime = Date.now() - startTime;
+              let url;
+              if (urlOrTitle.startsWith("http")) {
+                url = urlOrTitle;
+              } else {
+                const results = await fetchGoogleAPI(urlOrTitle);
 
-              //   alert(citation+" -> "+googleQuery);
+                const result = results[0];
 
-              const results = await fetchAvesAPI(googleQuery);
-              const avesTime = Date.now() - startTime - openaiTime;
-
-            //   alert(
-            //     `OpenAI: ${openaiTime}ms, Aves: ${avesTime}ms, Library: unknown. Query is ${JSON.stringify(
-            //       googleQuery
-            //     )}`
-            //   );
-              const prefixWhitelist = [
-                "https://arxiv.org/abs",
-                "https://openreview.net",
-              ];
-
-              const arxivResult = results[0];
-
-              if (!arxivResult)
-                alert(`Found no arXiv results for "${googleQuery}"`);
-              const url = arxivResult.url;
-
-              //   alert(citation+" -> "+googleQuery+" -> "+url);
+                if (!result)
+                  alert(`Found no arXiv results for "${googleQuery}"`);
+                url = result;
+              }
+              
 
               const addToLibrary = wrapInside(window.addToLibrary);
               await addToLibrary(url, "Inline citations");
-              const libraryTime =
-                Date.now() - startTime - avesTime - openaiTime;
             } catch (err) {
               alert(err);
             }
