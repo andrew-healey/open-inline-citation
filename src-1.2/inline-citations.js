@@ -1,12 +1,4 @@
 addListeners = async () => {
-  const openaiApiKey =
-    "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" ||
-    Zotero.Prefs.get("extensions.open-inline-citation.openai-api-key");
-  const googleApiKey = "AIzaSyDfSvIBjkKv4EkkZjK9auGOTJBoS1PRxEE";
-
-  if (!openaiApiKey) throw new Error("OpenAI API key not set");
-  if (!googleApiKey) throw new Error("Google API key not set");
-
   const activeTab = Zotero.getActiveZoteroPane();
   const activeDoc = activeTab.document;
   const activeWindow = activeDoc.defaultView;
@@ -89,9 +81,7 @@ addListeners = async () => {
               )[0];
             }
 
-            // activeDoc.defaultView.alert(JSON.stringify(newItem));
-
-            // Open the first new item in a new tab
+            // Open the new item in a new tab
             activeDoc.defaultView.ZoteroPane_Local.viewItems([newItem]);
             res();
           });
@@ -99,7 +89,6 @@ addListeners = async () => {
       }
       window.addToLibrary = wrapOutside(addToLibrary);
 
-      window.openaiApiKey = openaiApiKey;
 
       var script = document.createElement("script");
 
@@ -184,70 +173,13 @@ addListeners = async () => {
                 .reduce((agg,nxt)=>agg.endsWith("-") ? agg.slice(0,-1)+nxt:agg+" "+nxt,"")
                 .trim();
 
-            const apiKey = window.openaiApiKey;
-            async function fetchOpenAI(citationText) {
-                return citationText;
-              const response = await fetch(
-                "https://api.openai.com/v1/chat/completions",
-                {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    Authorization: "Bearer " + apiKey,
-                  },
-                  body: JSON.stringify({
-                    model: "gpt-3.5-turbo-16k",
-                    messages: [
-                      {
-                        role: "user",
-                        content: `Here's a bibliography entry, with an author+date+title+etc for a paper: ${JSON.stringify(
-                          "Kearns, M. and Valiant, L. (1994). Cryptographic limitations on learning boolean formulae and finite automata. Journal of the ACM (JACM) 41 67–95."
-                        )}\nExtract either the URL OR the title. Put it in "quotes".`,
-                      },
-                      {
-                        role: "assistant",
-                        content: `"Cryptographic limitations on learning boolean formulae and finite automata"`,
-                      },
-                      {
-                        role: "user",
-                        content: `Here's a bibliography entry, with an author+date+title+etc for a paper: ${JSON.stringify(
-                          citationText
-                        )}\nExtract either the URL OR the title. Put it in "quotes".`,
-                      },
-                      
-                    ],
-                    temperature: 0,
-                    max_tokens: 256,
-                    top_p: 1,
-                    frequency_penalty: 0,
-                    presence_penalty: 0,
-                  }),
-                }
-              );
-
-              const data = await response.json();
-              if (!data.choices) throw new Error(JSON.stringify(data));
-              const { content } = data.choices[0].message;
-              const quotesMatch = content.match(/"(.*)"/);
-            //   alert(content)
-              return quotesMatch && quotesMatch[1].trim();
-            }
             try {
-              const urlOrTitle = await fetchOpenAI(citationText);
+                const results = await fetchGoogleAPI(citationText);
 
-              let url;
-              if (urlOrTitle.startsWith("http")) {
-                url = urlOrTitle;
-              } else {
-                const results = await fetchGoogleAPI(urlOrTitle);
+                const url = results[0];
 
-                const result = results[0];
-
-                if (!result)
+                if (!url)
                   alert(`Found no arXiv results for "${googleQuery}"`);
-                url = result;
-              }
-              
 
               const addToLibrary = wrapInside(window.addToLibrary);
               await addToLibrary(url, "Inline citations");
