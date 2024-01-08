@@ -1,4 +1,7 @@
 addListeners = async () => {
+    
+    
+    
   const activeTab = Zotero.getActiveZoteroPane();
   const activeDoc = activeTab.document;
   const activeWindow = activeDoc.defaultView;
@@ -7,13 +10,19 @@ addListeners = async () => {
   const readers = Zotero.Reader._readers.filter(
     (r) => r._window.document === activeDoc
   );
-  const reader = readers[0];
-  if (!reader) throw new Error("whoops");
-
-  for (let i = 0; reader._window.wrappedJSObject[i]; i++) {
+  if (readers.length===0) throw new Error("whoops");
+  
+//   alert(readers[0]._iframeWindow.document.body.innerText)
+  
+  const windows = await Zotero.getMainWindows();
+    for(let fakeWindow of windows){
+        for(let i=0;fakeWindow[i];i++) {
     try {
-      const window = reader._window.wrappedJSObject[i].wrappedJSObject;
+      const window = fakeWindow[i].wrappedJSObject;
       const document = window.document;
+    //   if(document.body && document.body.innerText.includes("NOTE")){
+    //       alert(`How many as? ${Array.from(document.querySelectorAll("a")).length}. Innertext ? ${document.body.innerText.slice(0,1000)}`)
+    //   } else continue;
 
       if (!document.body) {
         window.onload = () => addListeners();
@@ -33,21 +42,28 @@ addListeners = async () => {
         };
 
       async function fetchGoogleAPI(query) {
-        //   alert(encodeURIComponent(query))
         const res = await (
           await fetch(
-            `https://customsearch.googleapis.com/customsearch/v1?q=${encodeURIComponent(query)}&key=AIzaSyDfSvIBjkKv4EkkZjK9auGOTJBoS1PRxEE&cx=b11bc5cc9867043ab`
+            `https://customsearch.googleapis.com/customsearch/v1?q=${encodeURIComponent(query)}&key=AIzaSyDfSvIBjkKv4EkkZjK9auGOTJBoS1PRxEE&rsz=filtered_cse&num=3&hl=en&source=gcsc&gss=.com&cselibv=3bd4ac03c21554b3&cx=50682b062590c456e&safe=active&exp=csqr%2Ccc%2Capo`
           )
         ).json();
         if (!res.items) alert(JSON.stringify(res));
-        return res.items.map((i) => i.link);
+        return res.items
+          .map((i) => i.link)
+          .filter(l=>!(
+              l.startsWith("https://scholar.google.com/")
+          ))
+          .map(l=>
+            l.replace("https://arxiv.org/pdf","https://arxiv.org/abs")
+            .replace("https://openreview.net/pdf","https://openreview.net/forum")
+          )
       }
       window.fetchGoogleAPI = wrapOutside(fetchGoogleAPI);
 
       async function addToLibrary(url, collectionName) {
-        return new Promise((res) => {
-          Zotero.HTTP.processDocuments(url, async function (doc) {
-            // Get the collection ID
+          const docs = await Zotero.HTTP.processDocuments(url,doc=>doc);
+          const [doc] = docs;
+        
             let collections = Zotero.Collections.getByLibrary(
               Zotero.Libraries.userLibraryID
             );
@@ -57,8 +73,9 @@ addListeners = async () => {
             }
 
             let newItem = null;
-
-            if (url.endsWith(".pdf")) {
+            let headResponse = await Zotero.HTTP.request("HEAD", url);
+            let contentType = headResponse.getResponseHeader("Content-Type");
+            if (contentType && contentType.includes("application/pdf")) {
               newItem = await Zotero.Attachments.importFromURL({
                 url: url,
                 libraryID: Zotero.Libraries.userLibraryID,
@@ -67,35 +84,33 @@ addListeners = async () => {
             } else {
               let translate = new Zotero.Translate.Web();
 
-              if (url.includes("arxiv"))
-                translate.setTranslator("58ab2618-4a25-4b9b-83a7-80cd0259f896");
+              if (url.includes("arxiv.org/abs")) translate.setTranslator("58ab2618-4a25-4b9b-83a7-80cd0259f896");
               if (!doc) throw new Error("No document");
               translate.setDocument(doc);
+              
+              const tmp = await translate.translate({
+                  libraryID: Zotero.Libraries.userLibraryID,
+                  collections: [collection.id],
+                });
 
               // Translate the item
               newItem = (
-                await translate.translate({
-                  libraryID: Zotero.Libraries.userLibraryID,
-                  collections: [collection.id],
-                })
+                tmp
               )[0];
             }
 
             // Open the new item in a new tab
-            activeDoc.defaultView.ZoteroPane_Local.viewItems([newItem]);
-            res();
-          });
-        });
+            await activeDoc.defaultView.ZoteroPane_Local.viewItems([newItem]);
       }
       window.addToLibrary = wrapOutside(addToLibrary);
 
-
-      var script = document.createElement("script");
-
       // Define the function you want to run inside the iframe
-      script.textContent =
+        const toEval =
         "(" +
         (async () => {
+            // alert('hey')
+            window.document.body.style.opacity=1.0;
+            try{
           const wrapInside =
             (fn) =>
             async (...args) => {
@@ -137,20 +152,17 @@ addListeners = async () => {
               }
             }
 
-            if (!rightPage) alert("error, not found");
+            if (!rightPage) throw new Error("error, not found");
+
+            const annotations = await rightPage.getAnnotations();
+            const links = annotations.filter(annotation => annotation.subtype === 'Link');
 
             const strippedContent = [
               await rightPage.getTextContent(),
               nextPage && (await nextPage.getTextContent()),
             ]
               .filter((c) => c)
-              .map((c) =>
-                c.items.map((i) => ({
-                  str: i.str,
-                  transform: i.transform,
-                  height: i.height,
-                }))
-              )
+              .map((c) =>c.items)
               .reduce((agg, nxt) => [...agg, ...nxt], []);
 
             const firstMatchIdx = strippedContent.findIndex(
@@ -167,6 +179,19 @@ addListeners = async () => {
                 strippedContent[idx - 1].str.endsWith(".")
             );
             if (lastMatchIdx < 0) lastMatchIdx += strippedContent.length;
+            
+            const citationLink = strippedContent.slice(firstMatchIdx,lastMatchIdx).map(i=>
+               links
+              .filter(({rect,url})=>{
+                  const [xMin,yMin,xMax,yMax] = rect;
+                  const iCenterX = i.transform[4] + i.width/2;
+                  const iCenterY = i.transform[5] + i.height/2;
+                  
+                  const ret = iCenterX >= xMin && iCenterX <= xMax && iCenterY >= yMin && iCenterY <= yMax;
+                  return ret;
+              })
+            ).reduce((agg,nxt)=>[...agg,...nxt],[])[0];
+            
             const citationText = strippedContent
                 .slice(firstMatchIdx,lastMatchIdx)
                 .map(i=>i.str)
@@ -174,19 +199,29 @@ addListeners = async () => {
                 .trim();
 
             try {
+                let url;
+                if(citationLink) url = citationLink.url;
+                else {
                 const results = await fetchGoogleAPI(citationText);
+                
+                // alert(JSON.stringify(results))
 
-                const url = results[0];
+                 url = results[0];
+                }
 
                 if (!url)
                   alert(`Found no arXiv results for "${googleQuery}"`);
 
               const addToLibrary = wrapInside(window.addToLibrary);
+              
+              alert(`"${citation}"" ->\n"${citationText}" ->\n "${url}" (from ${citationLink?"metadata":"Google"})`)
               await addToLibrary(url, "Inline citations");
             } catch (err) {
               alert(err);
             }
           }
+          
+          if(document.body.innerText.includes("lower bounds are summed across")) alert("these lower bounds")
 
           const watchedEls = new WeakSet();
           window.citeListenersInterval = setInterval(() => {
@@ -196,9 +231,11 @@ addListeners = async () => {
             as.forEach((a) => watchedEls.add(a));
             as.forEach((a) => {
               const href = a.getAttribute("href");
-              if (href.startsWith("#cite.")) {
+              if (href.startsWith("#")) {
                 const tailEnd = href.slice(1);
                 const oldOnClick = a.onclick;
+                
+                // a.style.border="1px solid purple";
 
                 a.onclick = (evt) => {
                   if (evt.metaKey || evt.ctrlKey) {
@@ -216,15 +253,27 @@ addListeners = async () => {
                   return oldOnClick.call(this, evt);
                 };
                 return tailEnd;
+              } else {
+                  // a.style.border = "1px solid orange";
               }
             });
           }, 500);
+        } catch(err){
+            alert(err)
+        }
         }) +
-        ")()";
+        ")();";
+        
+        window.eval(toEval);
+        
 
-      document.body.appendChild(script);
     } catch (err) {
-      activeDoc.defaultView.alert(err);
+     alert(err);
     }
   }
+    }
+  
+//   alert("set all listeners")
 };
+
+// await addListeners()
