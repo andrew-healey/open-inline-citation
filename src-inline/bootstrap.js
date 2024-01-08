@@ -28,16 +28,16 @@ async function startup({ id, version, rootURI }) {
 }
 
 function onMainWindowLoad({ window }) {
-	MakeItRed.addToWindow(window);
+	// MakeItRed.addToWindow(window);
 }
 
 function onMainWindowUnload({ window }) {
-	MakeItRed.removeFromWindow(window);
+	// MakeItRed.removeFromWindow(window);
 }
 
 function shutdown() {
 	log("Shutting down 2.0");
-	MakeItRed.removeFromAllWindows();
+	// MakeItRed.removeFromAllWindows();
 	MakeItRed = undefined;
 }
 

@@ -214,7 +214,7 @@ addListeners = async () => {
 
               const addToLibrary = wrapInside(window.addToLibrary);
               
-              alert(`"${citation}"" ->\n"${citationText}" ->\n "${url}" (from ${citationLink?"metadata":"Google"})`)
+              // alert(`"${citation}"" ->\n"${citationText}" ->\n "${url}" (from ${citationLink?"metadata":"Google"})`)
               await addToLibrary(url, "Inline citations");
             } catch (err) {
               alert(err);
