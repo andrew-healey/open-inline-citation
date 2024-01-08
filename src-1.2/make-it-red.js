@@ -10,6 +10,7 @@ MakeItRed = {
 	addedElementIDs: [],
 	
 	init({ id, version, rootURI }) {
+		return;
 		if (this.initialized) return;
 		this.id = id;
 		this.version = version;
@@ -18,10 +19,12 @@ MakeItRed = {
 	},
 	
 	log(msg) {
+		return;
 		Zotero.debug("Open Inline Citation: " + msg);
 	},
 	
 	addToWindow(window) {
+		return;
 		let doc = window.document;
 		
 		// createElementNS() necessary in Zotero 6; createElement() defaults to HTML in Zotero 7
@@ -63,6 +66,7 @@ MakeItRed = {
 	},
 	
 	addToAllWindows() {
+		return;
 		var windows = Zotero.getMainWindows();
 		for (let win of windows) {
 			if (!win.ZoteroPane) continue;
@@ -71,6 +75,7 @@ MakeItRed = {
 	},
 	
 	storeAddedElement(elem) {
+		return;
 		if (!elem.id) {
 			throw new Error("Element must have an id");
 		}
@@ -78,6 +83,7 @@ MakeItRed = {
 	},
 	
 	removeFromWindow(window) {
+		return;
 		var doc = window.document;
 		// Remove all elements added to DOM
 		for (let id of this.addedElementIDs) {
@@ -89,6 +95,7 @@ MakeItRed = {
 	},
 	
 	removeFromAllWindows() {
+		return;
 		var windows = Zotero.getMainWindows();
 		for (let win of windows) {
 			if (!win.ZoteroPane) continue;
@@ -97,6 +104,7 @@ MakeItRed = {
 	},
 	
 	toggleGreen(window, enabled) {
+		return;
 		let docElem = window.document.documentElement;
 		// Element#toggleAttribute() is not supported in Zotero 6
 		if (enabled) {
@@ -108,6 +116,7 @@ MakeItRed = {
 	},
 	
 	async main() {
+		return;
 		// Global properties are imported above in Zotero 6 and included automatically in
 		// Zotero 7
 		var host = new URL('https://foo.com/path').host;
