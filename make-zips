@@ -4,6 +4,9 @@ set -euo pipefail
 rm -rf build
 mkdir build
 
-cd src-1.2
+cd src
 zip -r ../build/open-inline-citation.xpi *
 cd ../build
+
+echo "Hash of current version:"
+shasum -a 256 open-inline-citation.xpi | cut -d' ' -f1

@@ -1,12 +1,13 @@
 {
 	"manifest_version": 2,
 	"name": "Open Inline Citation",
-	"version": "0.1",
+	"version": "0.2",
 	"description": "CMD-click any inline citation to read it in a new tab",
 	"homepage_url": "https://github.com/andrew-healey/open-inline-citation",
 	"applications": {
 		"zotero": {
 			"id": "open-inline-citation@example.com",
+			"update_url": "https://raw.githubusercontent.com/andrew-healey/open-inline-citation/main/updates.json",
 			"strict_min_version": "6.999",
 			"strict_max_version": "7.0.*"
 		}

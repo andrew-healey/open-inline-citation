@@ -1,3 +1,5 @@
+const version = "0.2";
+
 if (typeof Zotero == "undefined") {
   var Zotero;
 }
@@ -127,7 +129,7 @@ function setDefaultPrefs(rootURI) {
 async function install() {
   await waitForZotero();
 
-  log("Installed 1.2");
+  log(`Installed ${version}`);
 }
 
 async function startup({
@@ -138,7 +140,7 @@ async function startup({
 }) {
   await waitForZotero();
 
-  log("Starting 1.2");
+  log(`Starting ${version}`);
 
   // 'Services' may not be available in Zotero 6
   if (typeof Services == "undefined") {
@@ -155,7 +157,6 @@ async function startup({
     setDefaultPrefs(rootURI);
   }
 
-  Services.scriptloader.loadSubScript(rootURI + "make-it-red.js");
   Services.scriptloader.loadSubScript(rootURI + "inline-citations.js");
 
   Zotero.setTimeout(() => addListeners(), 2000);
@@ -170,27 +171,19 @@ async function startup({
     },
     ["tab"]
   );
-
-  MakeItRed.init({ id, version, rootURI });
-  MakeItRed.addToAllWindows();
-  await MakeItRed.main();
 }
 
 function onMainWindowLoad({ window }) {}
 
 function onMainWindowUnload({ window }) {
-  MakeItRed.removeFromWindow(window);
 }
 
 function shutdown() {
-  log("Shutting down 1.2");
+  log(`Shutting down ${version}`);
 
   if (Zotero.platformMajorVersion < 102) {
     removeMainWindowListener();
   }
-
-  MakeItRed.removeFromAllWindows();
-  MakeItRed = undefined;
 }
 
 function uninstall() {
@@ -200,5 +193,5 @@ function uninstall() {
     return;
   }
 
-  log("Uninstalled 1.2");
+  log(`Uninstalled ${version}`);
 }
