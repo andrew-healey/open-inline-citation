@@ -23,7 +23,7 @@ addListeners = async (doDebug=false) => {
         if(!document.title.endsWith("PDF.js viewer")) continue;
 
         const readers = Zotero.Reader._readers.filter( (r) => r._iframeWindow && r._iframeWindow.document.wrappedJSObject === document);
-        if(readers.length!==1) alert("Error: no Reader matches this PDF! "+document.title)
+        if(readers.length!==1) throw new Error("Error: no Reader matches this PDF! "+document.title)
         const [reader] = readers;
 
         const itemID = reader.itemID
@@ -43,36 +43,36 @@ addListeners = async (doDebug=false) => {
               .catch((err) => window[key].rej(err + ""));
           };
 
-          // const metaphorQuery = async (query) => {
-          //   const url = 'https://api.metaphor.systems/search';
-          //   const apiKey = '31c0a685-5434-4a68-ab73-d018e15cd14d'; // Replace with your API key
-          //   const useAutoprompt = false; // Set to true if you want to use a traditional query
+          const metaphorQuery = async (query) => {
+            const url = 'https://api.metaphor.systems/search';
+            const apiKey = '31c0a685-5434-4a68-ab73-d018e15cd14d'; // Replace with your API key
+            const useAutoprompt = false; // Set to true if you want to use a traditional query
           
-          //   const body = {
-          //     query: query,
-          //     useAutoprompt: useAutoprompt,
-          //     numResults: 10, // Optional, defaults to 10
-          //     // Other optional parameters can be added here,
-          //       type:"keyword",
-          //       // excludeDomains:["scholar.google.com","dl.acm.org"]
-          //   };
+            const body = {
+              query: query,
+              useAutoprompt: useAutoprompt,
+              numResults: 10, // Optional, defaults to 10
+              // Other optional parameters can be added here,
+                type:"keyword",
+                // excludeDomains:["scholar.google.com","dl.acm.org"]
+            };
           
-          //   const response = await fetch(url, {
-          //     method: 'POST',
-          //     headers: {
-          //       'Content-Type': 'application/json',
-          //       'X-Api-Key': apiKey,
-          //     },
-          //     body: JSON.stringify(body),
-          //   });
+            const response = await fetch(url, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-Api-Key': apiKey,
+              },
+              body: JSON.stringify(body),
+            });
           
-          //   if (!response.ok) {
-          //     throw new Error(`HTTP error! status: ${response.status}`);
-          //   }
+            if (!response.ok) {
+              throw new Error(`HTTP error! status: ${response.status}`);
+            }
           
-          //   const data = await response.json();
-          // return data.results.map(r=>r.url);
-          // };
+            const data = await response.json();
+          return data.results.map(r=>r.url);
+          };
 
           // fetchGoogleAPI = metaphorQuery;
           
@@ -90,6 +90,25 @@ addListeners = async (doDebug=false) => {
                   "https://openreview.net/forum"
                 )
             );
+          
+            async function fetchSerply(query) {
+              const options = {
+                method: 'GET',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'X-User-Agent': '',
+                  'X-Proxy-Location': '',
+                  'X-Api-Key': 'KNCQBvdgcZyVYvWGVboELXYD'
+                }
+              };
+            
+              const url = `https://api.serply.io/v1/search/q=${encodeURIComponent(query)}`;
+          
+              const response = await fetch(url, options);
+              const data = await response.json();
+              const links = data.results.map(r=>r.link);
+              return postprocess(links);
+            }
         
           async function fetchScrapeItAPI(query){
 const url = `https://api.scrape-it.cloud/scrape/google?q=${encodeURIComponent(query)}&filter=1&domain=google.com&gl=us&hl=en&deviceType=desktop`;
@@ -117,7 +136,7 @@ return postprocess(links);
           const links = res.items.map((i) => i.link);
           return postprocess(links);
         }
-        window.fetchGoogleAPI = wrapOutside(fetchScrapeItAPI);
+        window.fetchGoogleAPI = wrapOutside(fetchSerply);
 
         async function addToLibrary(url, currItemID) {
           const docs = await Zotero.HTTP.processDocuments(url, (doc) => doc);
@@ -208,9 +227,20 @@ return postprocess(links);
                 );
                 if (!destination)
                   alert(decodeURIComponent(citation) + " not found");
+                  
                 const loc = destination[0].num;
-                const targetY = destination[3];
-                const targetX = destination[2];
+                const {name} = destination[1];
+                
+                let targetX=0;
+                let targetY=Infinity; // very very top of page
+                if(name === "XYZ") {
+                    targetX = destination[2];
+                    targetY = destination[3];
+                }else if(name==="FitH"){
+                    targetY = destination[2];
+                } else {
+                    throw new Error("Unrecognized link!")
+                }
 
                 let rightPage = null;
                 let nextPage = null;
@@ -239,16 +269,25 @@ return postprocess(links);
                   .map((c) => c.items)
                   .reduce((agg, nxt) => [...agg, ...nxt], []);
 
-                const firstMatchIdx = strippedContent.findIndex(
-                  (i,idx) => (i.transform[4]+i.width/2) >= targetX && i.transform[5] + i.height/2 <= targetY
+                let firstMatchIdx = strippedContent.findIndex(
+                  (i,idx) => (i.transform[4]+i.width/2) >= targetX && i.transform[5] <= targetY && i.transform[5] >= targetY - 15
                   // and is a newline
                   // Prevents bugs with i.e. McAuley et al 2015 in the WT5 paper
                   && (
                       idx === 0 ||
-                      Math.abs(i.transform[5] - strippedContent[idx - 1].transform[5]) >= i.height * 0.5 ||
+                      Math.abs(i.transform[5] - strippedContent[idx - 1].transform[5]) >= i.height * 1.52 ||
                       i.str.match(/\[\d+\]/)
                      )
                 );
+
+                if(firstMatchIdx<0) throw new Error("Couldn't find bibliography entry: "+JSON.stringify(destination))/*+" "+
+                  JSON.stringify(strippedContent.map(i=>({
+                      str:i.str,
+                      transform:i.transform,
+                      width:i.width,
+                      height:i.height
+                  })))
+                )*/
 
                 let lastMatchIdx = strippedContent.findIndex(
                   (i, idx) =>
