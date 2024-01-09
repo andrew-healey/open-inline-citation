@@ -1,8 +1,8 @@
-addListeners = async () => {
+addListeners = async (doDebug=false) => {
   const activeTab = Zotero.getActiveZoteroPane();
   const activeDoc = activeTab.document;
   const activeWindow = activeDoc.defaultView;
-  const fetch = activeWindow.fetch;
+  const {fetch,alert} = activeWindow;
 
   const readers = Zotero.Reader._readers.filter(
     (r) => r._window.document === activeDoc
@@ -22,12 +22,14 @@ addListeners = async () => {
         }
         if(!document.title.endsWith("PDF.js viewer")) continue;
 
-        const readers = Zotero.Reader._readers.filter( (r) => r._iframeWindow.document.wrappedJSObject === document);
+        const readers = Zotero.Reader._readers.filter( (r) => r._iframeWindow && r._iframeWindow.document.wrappedJSObject === document);
         if(readers.length!==1) alert("Error: no Reader matches this PDF! "+document.title)
         const [reader] = readers;
 
         const itemID = reader.itemID
         window.itemID = itemID;
+
+        window.doDebug = doDebug;
 
         if (window.citeListenersInterval !== undefined)
           window.clearInterval(window.citeListenersInterval);
@@ -41,18 +43,57 @@ addListeners = async () => {
               .catch((err) => window[key].rej(err + ""));
           };
 
+          // const metaphorQuery = async (query) => {
+          //   const url = 'https://api.metaphor.systems/search';
+          //   const apiKey = '31c0a685-5434-4a68-ab73-d018e15cd14d'; // Replace with your API key
+          //   const useAutoprompt = false; // Set to true if you want to use a traditional query
+          
+          //   const body = {
+          //     query: query,
+          //     useAutoprompt: useAutoprompt,
+          //     numResults: 10, // Optional, defaults to 10
+          //     // Other optional parameters can be added here,
+          //       type:"keyword",
+          //       // excludeDomains:["scholar.google.com","dl.acm.org"]
+          //   };
+          
+          //   const response = await fetch(url, {
+          //     method: 'POST',
+          //     headers: {
+          //       'Content-Type': 'application/json',
+          //       'X-Api-Key': apiKey,
+          //     },
+          //     body: JSON.stringify(body),
+          //   });
+          
+          //   if (!response.ok) {
+          //     throw new Error(`HTTP error! status: ${response.status}`);
+          //   }
+          
+          //   const data = await response.json();
+          // return data.results.map(r=>r.url);
+          // };
+
+          // fetchGoogleAPI = metaphorQuery;
+          
+          // await metaphorQuery('Ronan Collobert, Jason Weston, Leon Bottou, Michael Karlen nad Koray Kavukcuoglu, and Pavel Kuksa. Natural Language Processing (Almost) from Scratch. Journal of Machine Learning Research')
+
         async function fetchGoogleAPI(query) {
           const res = await (
-            await fetch(
-              `https://customsearch.googleapis.com/customsearch/v1?q=${encodeURIComponent(
-                query
-              )}&key=AIzaSyDfSvIBjkKv4EkkZjK9auGOTJBoS1PRxEE&rsz=filtered_cse&num=3&hl=en&source=gcsc&gss=.com&cselibv=3bd4ac03c21554b3&cx=50682b062590c456e&safe=active&exp=csqr%2Ccc%2Capo`
-            )
-          ).json();
-          if (!res.items) alert(JSON.stringify(res));
+          await fetch(
+            `https://customsearch.googleapis.com/customsearch/v1?q=${encodeURIComponent(query)}&key=AIzaSyDfSvIBjkKv4EkkZjK9auGOTJBoS1PRxEE&rsz=filtered_cse&num=3&hl=en&source=gcsc&gss=.com&cselibv=3bd4ac03c21554b3&cx=50682b062590c456e&safe=active&exp=csqr%2Ccc%2Capo`
+          )
+        ).json();
+          if (!res.items) {
+            res.query = query;
+            alert(JSON.stringify(res));
+          }
           return res.items
             .map((i) => i.link)
-            .filter((l) => !l.startsWith("https://scholar.google.com/"))
+            .filter((l) =>
+            !l.startsWith("https://scholar.google.com/") &&
+            !l.startsWith("https://dl.acm.org/")
+            )
             .map((l) =>
               l
                 .replace("https://arxiv.org/pdf", "https://arxiv.org/abs")
@@ -104,15 +145,16 @@ addListeners = async () => {
 
 
           // Assume oldItemID is the ID of the old item
-          let oldItemFile = await Zotero.Items.getAsync(currItemID);
-          let oldItem = oldItemFile.parentItem;//await Zotero.Items.getByLibraryAndKey(Zotero.Libraries.userLibraryID, oldItemFile.parentItem);
-          let oldItemCollections = oldItem.getCollections();
-          alert(JSON.stringify(oldItemCollections))
+          if(currItemID){
+              let oldItemFile = await Zotero.Items.getAsync(currItemID);
+              let oldItem = oldItemFile.parentItem;//await Zotero.Items.getByLibraryAndKey(Zotero.Libraries.userLibraryID, oldItemFile.parentItem);
+              let oldItemCollections = oldItem.getCollections();
+    
+              // Add the new item to the same collections as the old item
+              newItem.setCollections(oldItemCollections);
+          }
 
-          // Add the new item to the same collections as the old item
-          newItem.setCollections(oldItemCollections);
-
-          newItem = await Zotero.Items.getAsync(newItem.id);
+        //   newItem = await Zotero.Items.getAsync(newItem.id);
           // Add the tag to the new item
           newItem.addTag("inline-citation");
           // Save the changes to the item
@@ -145,8 +187,7 @@ addListeners = async () => {
               const fetchGoogleAPI = wrapInside(window.fetchGoogleAPI);
 
               async function openInlineCitation(citation) {
-                const startTime = Date.now();
-                const { pdfjsLib, PDFViewerApplication, PDFPageProxy } = window;
+                const { PDFViewerApplication } = window;
                 const pdfDoc = PDFViewerApplication.pdfDocument;
                 const destination = await pdfDoc.getDestination(
                   decodeURIComponent(citation)
@@ -185,17 +226,27 @@ addListeners = async () => {
                   .reduce((agg, nxt) => [...agg, ...nxt], []);
 
                 const firstMatchIdx = strippedContent.findIndex(
-                  (i) => i.transform[4] > targetX && i.transform[5] < targetY
+                  (i,idx) => (i.transform[4]+i.width/2) >= targetX && i.transform[5] + i.height/2 <= targetY
+                  // and is a newline
+                  // Prevents bugs with i.e. McAuley et al 2015 in the WT5 paper
+                  && (
+                      Math.abs(i.transform[5] - strippedContent[idx - 1].transform[5]) >= i.height * 0.5 ||
+                      i.str.match(/\[\d+\]/)
+                     )
                 );
 
                 let lastMatchIdx = strippedContent.findIndex(
                   (i, idx) =>
-                    idx > firstMatchIdx &&
-                    Math.abs(
-                      i.transform[5] - strippedContent[idx - 1].transform[5]
-                    ) >=
-                      i.height * 1.5 &&
-                    strippedContent[idx - 1].str.endsWith(".")
+                    idx > firstMatchIdx && (
+                        Math.abs(
+                          i.transform[5] - strippedContent[idx - 1].transform[5]
+                        ) >=
+                          i.height * 1.25 &&
+                        // assume that every citation ends with a period.
+                        strippedContent[idx - 1].str.endsWith(".")
+                        // but sometimes this isn't true (see Visual Instruction Tuning), so we also assume every [1] is a new citation
+                        || i.str.match(/\[\d+\]/)
+                    )
                 );
                 if (lastMatchIdx < 0) lastMatchIdx += strippedContent.length;
 
@@ -207,12 +258,10 @@ addListeners = async () => {
                       const iCenterX = i.transform[4] + i.width / 2;
                       const iCenterY = i.transform[5] + i.height / 2;
 
-                      const ret =
-                        iCenterX >= xMin &&
+                      return url && iCenterX >= xMin &&
                         iCenterX <= xMax &&
                         iCenterY >= yMin &&
                         iCenterY <= yMax;
-                      return ret;
                     })
                   )
                   .reduce((agg, nxt) => [...agg, ...nxt], [])[0];
@@ -227,34 +276,32 @@ addListeners = async () => {
                         : agg + " " + nxt,
                     ""
                   )
-                  .trim();
+                  .trim()
+                  // remove words with *no* letters
+                  .split(" ").filter(w=>w.match(/[a-zA-Z]/)).join(" ");
 
                 try {
+                  let results;
                   let url;
                   if (citationLink) url = citationLink.url;
                   else {
-                    const results = await fetchGoogleAPI(citationText);
+                    results = await fetchGoogleAPI(citationText);
 
                     url = results[0];
                   }
 
                   if (!url)
-                    alert(`Found no arXiv results for "${googleQuery}"`);
+                    throw new Error(`Found no results for "${citationText}"`);
+                  
+                  if(doDebug) alert(`${citation} ->\n${JSON.stringify(citationText)} ->\n${url} (from ${citationLink ? "metadata" : "Google"})${citationLink ? "" : "\n\n"+results.join("\n")}}`)
 
                   const addToLibrary = wrapInside(window.addToLibrary);
 
                   await addToLibrary(url, window.itemID);
                 } catch (err) {
-                  alert(err);
+                  alert(err+"\n"+err.stack);
                 }
               }
-
-              if (
-                document.body.innerText.includes(
-                  "lower bounds are summed across"
-                )
-              )
-                alert("these lower bounds");
 
               const watchedEls = new WeakSet();
               window.citeListenersInterval = setInterval(() => {
@@ -268,7 +315,8 @@ addListeners = async () => {
                     const tailEnd = href.slice(1);
                     const oldOnClick = a.onclick;
 
-                    // a.style.border="1px solid purple";
+                    if(doDebug)
+                      a.style.border="1px solid purple";
 
                     a.onclick = (evt) => {
                       if (evt.metaKey || evt.ctrlKey) {
@@ -287,23 +335,24 @@ addListeners = async () => {
                     };
                     return tailEnd;
                   } else {
-                    // a.style.border = "1px solid orange";
+                    if(doDebug)
+                      a.style.border = "1px solid orange";
                   }
                 });
               }, 500);
             } catch (err) {
-              alert(err);
+              alert(err+"\n"+err.stack);
             }
           }) +
           ")();";
 
         window.eval(toEval);
       } catch (err) {
-        alert(err);
+        alert(err+"\n"+err.stack);
       }
     }
   }
 
 };
 
-// await addListeners()
+// await addListeners(true)
