@@ -78,19 +78,7 @@ addListeners = async (doDebug=false) => {
           
           // await metaphorQuery('Ronan Collobert, Jason Weston, Leon Bottou, Michael Karlen nad Koray Kavukcuoglu, and Pavel Kuksa. Natural Language Processing (Almost) from Scratch. Journal of Machine Learning Research')
 
-        async function fetchGoogleAPI(query) {
-          const res = await (
-          await fetch(
-            `https://customsearch.googleapis.com/customsearch/v1?q=${encodeURIComponent(query)}&key=AIzaSyDfSvIBjkKv4EkkZjK9auGOTJBoS1PRxEE&rsz=filtered_cse&num=3&hl=en&source=gcsc&gss=.com&cselibv=3bd4ac03c21554b3&cx=50682b062590c456e&safe=active&exp=csqr%2Ccc%2Capo`
-          )
-        ).json();
-          if (!res.items) {
-            res.query = query;
-            alert(JSON.stringify(res));
-          }
-          return res.items
-            .map((i) => i.link)
-            .filter((l) =>
+          const postprocess = (links) => links.filter((l) =>
             !l.startsWith("https://scholar.google.com/") &&
             !l.startsWith("https://dl.acm.org/")
             )
@@ -102,8 +90,34 @@ addListeners = async (doDebug=false) => {
                   "https://openreview.net/forum"
                 )
             );
+        
+          async function fetchScrapeItAPI(query){
+const url = `https://api.scrape-it.cloud/scrape/google?q=${encodeURIComponent(query)}&filter=1&domain=google.com&gl=us&hl=en&deviceType=desktop`;
+const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'x-api-key': 'b16d3a3b-e30e-412c-be26-1dbaab8f3c08'
+            }
+        });
+        const data = await response.json();
+const links = data.organicResults.map(r=>r.link)
+return postprocess(links);
+          }
+
+        async function fetchGoogleAPI(query) {
+          const res = await (
+          await fetch(
+            `https://customsearch.googleapis.com/customsearch/v1?q=${encodeURIComponent(query)}&key=AIzaSyDfSvIBjkKv4EkkZjK9auGOTJBoS1PRxEE&rsz=filtered_cse&num=3&hl=en&source=gcsc&gss=.com&cselibv=3bd4ac03c21554b3&cx=50682b062590c456e&safe=active&exp=csqr%2Ccc%2Capo`
+          )
+        ).json();
+          if (!res.items) {
+            res.query = query;
+            alert(JSON.stringify(res));
+          }
+          const links = res.items.map((i) => i.link);
+          return postprocess(links);
         }
-        window.fetchGoogleAPI = wrapOutside(fetchGoogleAPI);
+        window.fetchGoogleAPI = wrapOutside(fetchScrapeItAPI);
 
         async function addToLibrary(url, currItemID) {
           const docs = await Zotero.HTTP.processDocuments(url, (doc) => doc);
@@ -230,6 +244,7 @@ addListeners = async (doDebug=false) => {
                   // and is a newline
                   // Prevents bugs with i.e. McAuley et al 2015 in the WT5 paper
                   && (
+                      idx === 0 ||
                       Math.abs(i.transform[5] - strippedContent[idx - 1].transform[5]) >= i.height * 0.5 ||
                       i.str.match(/\[\d+\]/)
                      )
