@@ -5,7 +5,7 @@
     <Description about="urn:mozilla:install-manifest">
         <em:id>open-inline-citation@example.com</em:id>
         <em:name>Open Inline Citation</em:name>
-        <em:version>0.2</em:version>
+        <em:version>0.3</em:version>
         <em:multiprocessCompatible>true</em:multiprocessCompatible>
         <em:updateURL>https://raw.githubusercontent.com/andrew-healey/open-inline-citation/main/updates.json</em:updateURL>
         <em:homepageURL>https://github.com/andrew-healey/open-inline-citation</em:homepageURL>

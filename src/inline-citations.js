@@ -20,6 +20,14 @@ addListeners = async () => {
           window.onload = () => addListeners();
           continue;
         }
+        if(!document.title.endsWith("PDF.js viewer")) continue;
+
+        const readers = Zotero.Reader._readers.filter( (r) => r._iframeWindow.document.wrappedJSObject === document);
+        if(readers.length!==1) alert("Error: no Reader matches this PDF! "+document.title)
+        const [reader] = readers;
+
+        const itemID = reader.itemID
+        window.itemID = itemID;
 
         if (window.citeListenersInterval !== undefined)
           window.clearInterval(window.citeListenersInterval);
@@ -56,17 +64,17 @@ addListeners = async () => {
         }
         window.fetchGoogleAPI = wrapOutside(fetchGoogleAPI);
 
-        async function addToLibrary(url, collectionName) {
+        async function addToLibrary(url, currItemID) {
           const docs = await Zotero.HTTP.processDocuments(url, (doc) => doc);
           const [doc] = docs;
 
-          let collections = Zotero.Collections.getByLibrary(
-            Zotero.Libraries.userLibraryID
-          );
-          let collection = collections.find((c) => c.name === collectionName);
-          if (!collection) {
-            throw new Error(`Collection "${collectionName}" not found`);
-          }
+          // let collections = Zotero.Collections.getByLibrary(
+          //   Zotero.Libraries.userLibraryID
+          // );
+          // let collection = collections.find((c) => c.name === collectionName);
+          // if (!collection) {
+          //   throw new Error(`Collection "${collectionName}" not found`);
+          // }
 
           let newItem = null;
           let headResponse = await Zotero.HTTP.request("HEAD", url);
@@ -75,7 +83,7 @@ addListeners = async () => {
             newItem = await Zotero.Attachments.importFromURL({
               url: url,
               libraryID: Zotero.Libraries.userLibraryID,
-              collections: [collection.key],
+              // collections: [collection.key],
             });
           } else {
             let translate = new Zotero.Translate.Web();
@@ -87,13 +95,28 @@ addListeners = async () => {
 
             const tmp = await translate.translate({
               libraryID: Zotero.Libraries.userLibraryID,
-              collections: [collection.id],
+              // collections: [collection.id],
             });
 
             // Translate the item
             newItem = tmp[0];
           }
 
+
+          // Assume oldItemID is the ID of the old item
+          let oldItemFile = await Zotero.Items.getAsync(currItemID);
+          let oldItem = oldItemFile.parentItem;//await Zotero.Items.getByLibraryAndKey(Zotero.Libraries.userLibraryID, oldItemFile.parentItem);
+          let oldItemCollections = oldItem.getCollections();
+          alert(JSON.stringify(oldItemCollections))
+
+          // Add the new item to the same collections as the old item
+          newItem.setCollections(oldItemCollections);
+
+          newItem = await Zotero.Items.getAsync(newItem.id);
+          // Add the tag to the new item
+          newItem.addTag("inline-citation");
+          // Save the changes to the item
+          await newItem.saveTx();
           // Open the new item in a new tab
           await activeDoc.defaultView.ZoteroPane_Local.viewItems([newItem]);
         }
@@ -220,7 +243,7 @@ addListeners = async () => {
 
                   const addToLibrary = wrapInside(window.addToLibrary);
 
-                  await addToLibrary(url, "Inline citations");
+                  await addToLibrary(url, window.itemID);
                 } catch (err) {
                   alert(err);
                 }

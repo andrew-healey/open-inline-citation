@@ -9,7 +9,5 @@ A nice little plugin for Zotero 6 (and hopefully 7, I haven't tested).
 
 2. Open Zotero, go to Tools > Add-ons > gear icon > Install Add-on From File... and select the `open-inline-citation.xpi` file.
 
-3. Make a Collection called "Inline citations". The plugin will download inline citations here.
-
-4. CMD-click an inline citation!
+3. CMD-click an inline citation to open it in a new tab.
 

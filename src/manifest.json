@@ -1,7 +1,7 @@
 {
 	"manifest_version": 2,
 	"name": "Open Inline Citation",
-	"version": "0.2",
+	"version": "0.3",
 	"description": "CMD-click any inline citation to read it in a new tab",
 	"homepage_url": "https://github.com/andrew-healey/open-inline-citation",
 	"applications": {
