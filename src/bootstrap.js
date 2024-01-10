@@ -1,4 +1,4 @@
-const version = "0.3";
+const version = "0.4";
 
 if (typeof Zotero == "undefined") {
   var Zotero;
@@ -101,6 +101,9 @@ function removeMainWindowListener() {
   if (mainWindowListener) {
     Services.wm.removeListener(mainWindowListener);
   }
+  if(observerId) {
+    Zotero.Notifier.unregisterObserver(observerId);
+  }
 }
 
 // Loads default preferences from prefs.js in Zotero 6
@@ -132,6 +135,8 @@ async function install() {
   log(`Installed ${version}`);
 }
 
+let observerId;
+
 async function startup({
   id,
   version,
@@ -160,7 +165,7 @@ async function startup({
   Services.scriptloader.loadSubScript(rootURI + "inline-citations.js");
 
   Zotero.setTimeout(() => addListeners(), 2000);
-  Zotero.Notifier.registerObserver(
+  observerId = Zotero.Notifier.registerObserver(
     {
       notify: function (event, type, ids, extraData) {
         if (event === "select" && type === "tab") {
