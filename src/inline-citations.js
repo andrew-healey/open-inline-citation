@@ -226,7 +226,7 @@ return postprocess(links);
                   decodeURIComponent(citation)
                 );
                 if (!destination)
-                  alert(decodeURIComponent(citation) + " not found");
+                  throw new Error(decodeURIComponent(citation) + " is an invalid link");
                   
                 const loc = destination[0].num;
                 const {name} = destination[1];
@@ -275,7 +275,7 @@ return postprocess(links);
                   // Prevents bugs with i.e. McAuley et al 2015 in the WT5 paper
                   && (
                       idx === 0 ||
-                      Math.abs(i.transform[5] - strippedContent[idx - 1].transform[5]) >= i.height * 1.52 ||
+                      Math.abs(i.transform[5] - strippedContent[idx - 1].transform[5]) >= i.height * 1.25 ||
                       i.str.match(/\[\d+\]/)
                      )
                 );
