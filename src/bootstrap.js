@@ -164,18 +164,20 @@ async function startup({
 
   Services.scriptloader.loadSubScript(rootURI + "inline-citations.js");
 
-  Zotero.setTimeout(() => addListeners(), 2000);
+  Zotero.setTimeout(() => addListeners(false,parseFloat(version)), 2000);
   observerId = Zotero.Notifier.registerObserver(
     {
       notify: function (event, type, ids, extraData) {
         if (event === "select" && type === "tab") {
           console.log("Tab switched to", ids[0]);
-          Zotero.setTimeout(() => addListeners(), 2000);
+          Zotero.setTimeout(() => addListeners(false,parseFloat(version)), 2000);
         }
       },
     },
     ["tab"]
   );
+
+  console.warn(`OIC ${version} - Added main window listener ${observerId}`);
 }
 
 function onMainWindowLoad({ window }) {}
@@ -188,6 +190,7 @@ function shutdown() {
 
   if (Zotero.platformMajorVersion < 102) {
     removeMainWindowListener();
+    console.warn(`Open Inline Citation ${version} - Removed main window listener`);
   }
 }
 

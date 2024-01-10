@@ -1,8 +1,8 @@
-addListeners = async (doDebug=false) => {
+addListeners = async (doDebug = false, oicVersion = null) => {
   const activeTab = Zotero.getActiveZoteroPane();
   const activeDoc = activeTab.document;
   const activeWindow = activeDoc.defaultView;
-  const {fetch,alert} = activeWindow;
+  const { fetch, alert } = activeWindow;
 
   const readers = Zotero.Reader._readers.filter(
     (r) => r._window.document === activeDoc
@@ -20,19 +20,37 @@ addListeners = async (doDebug=false) => {
           window.onload = () => addListeners();
           continue;
         }
-        if(!document.title.endsWith("PDF.js viewer")) continue;
+        if (!document.title.endsWith("PDF.js viewer")) continue;
 
-        const readers = Zotero.Reader._readers.filter( (r) => r._iframeWindow && r._iframeWindow.document.wrappedJSObject === document);
-        if(readers.length!==1) throw new Error("Error: no Reader matches this PDF! "+document.title)
+        const readers = Zotero.Reader._readers.filter(
+          (r) =>
+            r._iframeWindow &&
+            r._iframeWindow.document.wrappedJSObject === document
+        );
+        if (readers.length !== 1){
+          setTimeout(()=>addListeners(), 30*1000);
+          continue;
+          // throw new Error(
+          //   "Error: no Reader matches this PDF! " + document.title
+          // );
+        }
         const [reader] = readers;
 
-        const itemID = reader.itemID
+        const itemID = reader.itemID;
         window.itemID = itemID;
 
         window.doDebug = doDebug;
 
-        if (window.citeListenersInterval !== undefined)
-          window.clearInterval(window.citeListenersInterval);
+        // new versions override old versions
+        // debug versions override old versions
+        if (window.citeListenersInterval !== undefined) {
+          if (doDebug || !oicVersion || oicVersion > window.oicVersion) {
+            window.clearInterval(window.citeListenersInterval);
+          } else {
+            continue;
+          }
+        }
+        window.oicVersion = oicVersion;
 
         const wrapOutside =
           (fn) =>
@@ -43,44 +61,43 @@ addListeners = async (doDebug=false) => {
               .catch((err) => window[key].rej(err + ""));
           };
 
-          const metaphorQuery = async (query) => {
-            const url = 'https://api.metaphor.systems/search';
-            const apiKey = '31c0a685-5434-4a68-ab73-d018e15cd14d'; // Replace with your API key
-            const useAutoprompt = false; // Set to true if you want to use a traditional query
-          
-            const body = {
-              query: query,
-              useAutoprompt: useAutoprompt,
-              numResults: 10, // Optional, defaults to 10
-              // Other optional parameters can be added here,
-                type:"keyword",
-                // excludeDomains:["scholar.google.com","dl.acm.org"]
-            };
-          
-            const response = await fetch(url, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'X-Api-Key': apiKey,
-              },
-              body: JSON.stringify(body),
-            });
-          
-            if (!response.ok) {
-              throw new Error(`HTTP error! status: ${response.status}`);
-            }
-          
-            const data = await response.json();
-          return data.results.map(r=>r.url);
+        const metaphorQuery = async (query) => {
+          const url = "https://api.metaphor.systems/search";
+          const apiKey = "31c0a685-5434-4a68-ab73-d018e15cd14d"; // Replace with your API key
+          const useAutoprompt = false; // Set to true if you want to use a traditional query
+
+          const body = {
+            query: query,
+            useAutoprompt: useAutoprompt,
+            numResults: 10, // Optional, defaults to 10
+            // Other optional parameters can be added here,
+            type: "keyword",
+            // excludeDomains:["scholar.google.com","dl.acm.org"]
           };
 
-          // fetchGoogleAPI = metaphorQuery;
-          
-          // await metaphorQuery('Ronan Collobert, Jason Weston, Leon Bottou, Michael Karlen nad Koray Kavukcuoglu, and Pavel Kuksa. Natural Language Processing (Almost) from Scratch. Journal of Machine Learning Research')
+          const response = await fetch(url, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Api-Key": apiKey,
+            },
+            body: JSON.stringify(body),
+          });
 
-          const postprocess = (links) => links.filter((l) =>
-            !l.startsWith("https://scholar.google.com/") &&
-            !l.startsWith("https://dl.acm.org/")
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+
+          const data = await response.json();
+          return data.results.map((r) => r.url);
+        };
+
+        const postprocess = (links) =>
+          links
+            .filter(
+              (l) =>
+                !l.startsWith("https://scholar.google.com/") &&
+                !l.startsWith("https://dl.acm.org/")
             )
             .map((l) =>
               l
@@ -90,45 +107,51 @@ addListeners = async (doDebug=false) => {
                   "https://openreview.net/forum"
                 )
             );
-          
-            async function fetchSerply(query) {
-              const options = {
-                method: 'GET',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'X-User-Agent': '',
-                  'X-Proxy-Location': '',
-                  'X-Api-Key': 'KNCQBvdgcZyVYvWGVboELXYD'
-                }
-              };
-            
-              const url = `https://api.serply.io/v1/search/q=${encodeURIComponent(query)}`;
-          
-              const response = await fetch(url, options);
-              const data = await response.json();
-              const links = data.results.map(r=>r.link);
-              return postprocess(links);
-            }
-        
-          async function fetchScrapeItAPI(query){
-const url = `https://api.scrape-it.cloud/scrape/google?q=${encodeURIComponent(query)}&filter=1&domain=google.com&gl=us&hl=en&deviceType=desktop`;
-const response = await fetch(url, {
-            method: 'GET',
+
+        async function fetchSerply(query) {
+          const options = {
+            method: "GET",
             headers: {
-                'x-api-key': 'b16d3a3b-e30e-412c-be26-1dbaab8f3c08'
-            }
-        });
-        const data = await response.json();
-const links = data.organicResults.map(r=>r.link)
-return postprocess(links);
-          }
+              "Content-Type": "application/json",
+              "X-User-Agent": "",
+              "X-Proxy-Location": "",
+              "X-Api-Key": "KNCQBvdgcZyVYvWGVboELXYD",
+            },
+          };
+
+          const url = `https://api.serply.io/v1/search/q=${encodeURIComponent(
+            query
+          )}`;
+
+          const response = await fetch(url, options);
+          const data = await response.json();
+          const links = data.results.map((r) => r.link);
+          return postprocess(links);
+        }
+
+        async function fetchScrapeItAPI(query) {
+          const url = `https://api.scrape-it.cloud/scrape/google?q=${encodeURIComponent(
+            query
+          )}&filter=1&domain=google.com&gl=us&hl=en&deviceType=desktop`;
+          const response = await fetch(url, {
+            method: "GET",
+            headers: {
+              "x-api-key": "b16d3a3b-e30e-412c-be26-1dbaab8f3c08",
+            },
+          });
+          const data = await response.json();
+          const links = data.organicResults.map((r) => r.link);
+          return postprocess(links);
+        }
 
         async function fetchGoogleAPI(query) {
           const res = await (
-          await fetch(
-            `https://customsearch.googleapis.com/customsearch/v1?q=${encodeURIComponent(query)}&key=AIzaSyDfSvIBjkKv4EkkZjK9auGOTJBoS1PRxEE&rsz=filtered_cse&num=3&hl=en&source=gcsc&gss=.com&cselibv=3bd4ac03c21554b3&cx=50682b062590c456e&safe=active&exp=csqr%2Ccc%2Capo`
-          )
-        ).json();
+            await fetch(
+              `https://customsearch.googleapis.com/customsearch/v1?q=${encodeURIComponent(
+                query
+              )}&key=AIzaSyDfSvIBjkKv4EkkZjK9auGOTJBoS1PRxEE&rsz=filtered_cse&num=3&hl=en&source=gcsc&gss=.com&cselibv=3bd4ac03c21554b3&cx=50682b062590c456e&safe=active&exp=csqr%2Ccc%2Capo`
+            )
+          ).json();
           if (!res.items) {
             res.query = query;
             alert(JSON.stringify(res));
@@ -141,14 +164,6 @@ return postprocess(links);
         async function addToLibrary(url, currItemID) {
           const docs = await Zotero.HTTP.processDocuments(url, (doc) => doc);
           const [doc] = docs;
-
-          // let collections = Zotero.Collections.getByLibrary(
-          //   Zotero.Libraries.userLibraryID
-          // );
-          // let collection = collections.find((c) => c.name === collectionName);
-          // if (!collection) {
-          //   throw new Error(`Collection "${collectionName}" not found`);
-          // }
 
           let newItem = null;
           let headResponse = await Zotero.HTTP.request("HEAD", url);
@@ -176,18 +191,17 @@ return postprocess(links);
             newItem = tmp[0];
           }
 
-
           // Assume oldItemID is the ID of the old item
-          if(currItemID){
-              let oldItemFile = await Zotero.Items.getAsync(currItemID);
-              let oldItem = oldItemFile.parentItem;//await Zotero.Items.getByLibraryAndKey(Zotero.Libraries.userLibraryID, oldItemFile.parentItem);
-              let oldItemCollections = oldItem.getCollections();
-    
-              // Add the new item to the same collections as the old item
-              newItem.setCollections(oldItemCollections);
+          if (currItemID) {
+            let oldItemFile = await Zotero.Items.getAsync(currItemID);
+            let oldItem = oldItemFile.parentItem; //await Zotero.Items.getByLibraryAndKey(Zotero.Libraries.userLibraryID, oldItemFile.parentItem);
+            let oldItemCollections = oldItem.getCollections();
+
+            // Add the new item to the same collections as the old item
+            newItem.setCollections(oldItemCollections);
           }
 
-        //   newItem = await Zotero.Items.getAsync(newItem.id);
+          //   newItem = await Zotero.Items.getAsync(newItem.id);
           // Add the tag to the new item
           newItem.addTag("inline-citation");
           // Save the changes to the item
@@ -226,20 +240,22 @@ return postprocess(links);
                   decodeURIComponent(citation)
                 );
                 if (!destination)
-                  throw new Error(decodeURIComponent(citation) + " is an invalid link");
-                  
+                  throw new Error(
+                    decodeURIComponent(citation) + " is an invalid link"
+                  );
+
                 const loc = destination[0].num;
-                const {name} = destination[1];
-                
-                let targetX=0;
-                let targetY=Infinity; // very very top of page
-                if(name === "XYZ") {
-                    targetX = destination[2];
-                    targetY = destination[3];
-                }else if(name==="FitH"){
-                    targetY = destination[2];
+                const { name } = destination[1];
+
+                let targetX = 0;
+                let targetY = Infinity; // very very top of page
+                if (name === "XYZ") {
+                  targetX = destination[2];
+                  targetY = destination[3];
+                } else if (name === "FitH") {
+                  targetY = destination[2];
                 } else {
-                    throw new Error("Unrecognized link!")
+                  throw new Error("Unrecognized link!");
                 }
 
                 let rightPage = null;
@@ -270,17 +286,25 @@ return postprocess(links);
                   .reduce((agg, nxt) => [...agg, ...nxt], []);
 
                 let firstMatchIdx = strippedContent.findIndex(
-                  (i,idx) => (i.transform[4]+i.width/2) >= targetX && i.transform[5] <= targetY && i.transform[5] >= targetY - 15
-                  // and is a newline
-                  // Prevents bugs with i.e. McAuley et al 2015 in the WT5 paper
-                  && (
-                      idx === 0 ||
-                      Math.abs(i.transform[5] - strippedContent[idx - 1].transform[5]) >= i.height * 1.25 ||
-                      i.str.match(/\[\d+\]/)
-                     )
+                  (i, idx) =>
+                    i.transform[4] + i.width / 2 >= targetX &&
+                    i.transform[5] <= targetY &&
+                    i.transform[5] >= targetY - 15 &&
+                    // and is a newline
+                    // Prevents bugs with i.e. McAuley et al 2015 in the WT5 paper
+                    (idx === 0 ||
+                      Math.abs(
+                        i.transform[5] - strippedContent[idx - 1].transform[5]
+                      ) >=
+                        i.height * 1.25 ||
+                      i.str.match(/\[\d+\]/))
                 );
 
-                if(firstMatchIdx<0) throw new Error("Couldn't find bibliography entry: "+JSON.stringify(destination))/*+" "+
+                if (firstMatchIdx < 0)
+                  throw new Error(
+                    "Couldn't find bibliography entry: " +
+                      JSON.stringify(destination)
+                  ); /*+" "+
                   JSON.stringify(strippedContent.map(i=>({
                       str:i.str,
                       transform:i.transform,
@@ -291,16 +315,15 @@ return postprocess(links);
 
                 let lastMatchIdx = strippedContent.findIndex(
                   (i, idx) =>
-                    idx > firstMatchIdx && (
-                        Math.abs(
-                          i.transform[5] - strippedContent[idx - 1].transform[5]
-                        ) >=
-                          i.height * 1.25 &&
-                        // assume that every citation ends with a period.
-                        strippedContent[idx - 1].str.endsWith(".")
-                        // but sometimes this isn't true (see Visual Instruction Tuning), so we also assume every [1] is a new citation
-                        || i.str.match(/\[\d+\]/)
-                    )
+                    idx > firstMatchIdx &&
+                    ((Math.abs(
+                      i.transform[5] - strippedContent[idx - 1].transform[5]
+                    ) >=
+                      i.height * 1.25 &&
+                      // assume that every citation ends with a period.
+                      strippedContent[idx - 1].str.endsWith(".")) ||
+                      // but sometimes this isn't true (see Visual Instruction Tuning), so we also assume every [1] is a new citation
+                      i.str.match(/\[\d+\]/))
                 );
                 if (lastMatchIdx < 0) lastMatchIdx += strippedContent.length;
 
@@ -312,10 +335,13 @@ return postprocess(links);
                       const iCenterX = i.transform[4] + i.width / 2;
                       const iCenterY = i.transform[5] + i.height / 2;
 
-                      return url && iCenterX >= xMin &&
+                      return (
+                        url &&
+                        iCenterX >= xMin &&
                         iCenterX <= xMax &&
                         iCenterY >= yMin &&
-                        iCenterY <= yMax;
+                        iCenterY <= yMax
+                      );
                     })
                   )
                   .reduce((agg, nxt) => [...agg, ...nxt], [])[0];
@@ -332,7 +358,9 @@ return postprocess(links);
                   )
                   .trim()
                   // remove words with *no* letters
-                  .split(" ").filter(w=>w.match(/[a-zA-Z]/)).join(" ");
+                  .split(" ")
+                  .filter((w) => w.match(/[a-zA-Z]/))
+                  .join(" ");
 
                 try {
                   let results;
@@ -346,14 +374,21 @@ return postprocess(links);
 
                   if (!url)
                     throw new Error(`Found no results for "${citationText}"`);
-                  
-                  if(doDebug) alert(`${citation} ->\n${JSON.stringify(citationText)} ->\n${url} (from ${citationLink ? "metadata" : "Google"})${citationLink ? "" : "\n\n"+results.join("\n")}}`)
+
+                  if (doDebug)
+                    alert(
+                      `${citation} ->\n${JSON.stringify(
+                        citationText
+                      )} ->\n${url} (from ${
+                        citationLink ? "metadata" : "Google"
+                      })${citationLink ? "" : "\n\n" + results.join("\n")}}`
+                    );
 
                   const addToLibrary = wrapInside(window.addToLibrary);
 
                   await addToLibrary(url, window.itemID);
                 } catch (err) {
-                  alert(err+"\n"+err.stack);
+                  alert(err + "\n" + err.stack);
                 }
               }
 
@@ -369,8 +404,7 @@ return postprocess(links);
                     const tailEnd = href.slice(1);
                     const oldOnClick = a.onclick;
 
-                    if(doDebug)
-                      a.style.border="1px solid purple";
+                    if (doDebug) a.style.border = "1px solid purple";
 
                     a.onclick = (evt) => {
                       if (evt.metaKey || evt.ctrlKey) {
@@ -389,24 +423,22 @@ return postprocess(links);
                     };
                     return tailEnd;
                   } else {
-                    if(doDebug)
-                      a.style.border = "1px solid orange";
+                    if (doDebug) a.style.border = "1px solid orange";
                   }
                 });
               }, 500);
             } catch (err) {
-              alert(err+"\n"+err.stack);
+              alert(err + "\n" + err.stack);
             }
           }) +
           ")();";
 
         window.eval(toEval);
       } catch (err) {
-        alert(err+"\n"+err.stack);
+        alert(err + "\n" + err.stack);
       }
     }
   }
-
 };
 
 // await addListeners(true)
