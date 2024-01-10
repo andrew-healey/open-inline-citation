@@ -5,7 +5,7 @@
         {
           "version": "0.2",
           "update_link": "https://github.com/andrew-healey/open-inline-citation/releases/download/v0.2/open-inline-citation.xpi",
-          "update_hash": "c568d6d2aeec7fda1dea473b3370a8b85b30d745d505bb38d5fcbf868580fc8a",
+          "update_hash": "sha256:c568d6d2aeec7fda1dea473b3370a8b85b30d745d505bb38d5fcbf868580fc8a",
           "applications": {
             "gecko": {
               "strict_min_version": "60.0"
@@ -15,7 +15,7 @@
         {
           "version": "0.3",
           "update_link": "https://github.com/andrew-healey/open-inline-citation/releases/download/v0.3/open-inline-citation.xpi",
-          "update_hash": "54aa4661bc46013cb3d045f9bd63837caff0334541f03d10df350232b193686e",
+          "update_hash": "sha256:54aa4661bc46013cb3d045f9bd63837caff0334541f03d10df350232b193686e",
           "applications": {
             "gecko": {
               "strict_min_version": "60.0"
