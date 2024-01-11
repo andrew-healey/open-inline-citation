@@ -21,6 +21,16 @@
               "strict_min_version": "60.0"
             }
           }
+        },
+        {
+          "version": "0.4",
+          "update_link": "https://github.com/andrew-healey/open-inline-citation/releases/download/v0.4/open-inline-citation.xpi",
+          "update_hash": "sha256:e9237a79e13c36215136e2d2172d25f4cb9e8142ad5018a70f6144d6bcec787b",
+          "applications": {
+            "gecko": {
+              "strict_min_version": "60.0"
+            }
+          }
         }
       ]
     }
