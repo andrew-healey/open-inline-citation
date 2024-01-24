@@ -153,8 +153,7 @@ addListeners = async (doDebug = false, oicVersion = null) => {
             )
           ).json();
           if (!res.items) {
-            res.query = query;
-            alert(JSON.stringify(res));
+            throw new Error("No results found");
           }
           const links = res.items.map((i) => i.link);
           return postprocess(links);
@@ -428,14 +427,14 @@ addListeners = async (doDebug = false, oicVersion = null) => {
                 });
               }, 500);
             } catch (err) {
-              alert(err + "\n" + err.stack);
+              if(window.doDebug) alert(err + "\n" + err.stack);
             }
           }) +
           ")();";
 
         window.eval(toEval);
       } catch (err) {
-        alert(err + "\n" + err.stack);
+        if(doDebug) alert(err + "\n" + err.stack);
       }
     }
   }

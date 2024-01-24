@@ -1,4 +1,4 @@
-const version = "0.4";
+const version = "0.5";
 
 if (typeof Zotero == "undefined") {
   var Zotero;
