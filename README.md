@@ -1,6 +1,8 @@
 # Open Inline Citation
 ## CMD-click an inline citation to read it in a new tab.
 
+![](imgs/demo.webp)
+
 A nice little plugin for Zotero 6 (and hopefully 7, I haven't tested).
 
 ## Installation
